@@ -114,10 +114,22 @@ public class ChooseAreaFragment extends Fragment {
                 else if (currentLevel == LEVEL_COUNTY)
                 {
                     String weatherId = countyList.get(position).getWeatherId();
-                    Intent intent = new Intent(getActivity(),WeatherActivity.class);
-                    intent.putExtra("weather_id",weatherId);
-                    startActivity(intent);
-                    getActivity().finish();
+                    //使用instanceof关键字判断一个对象是否属于某个类的实例
+                    if (getActivity() instanceof MainActivity)//判断当前的fragment是否是MainActivity的实例
+                    {
+                        Intent intent = new Intent(getActivity(),WeatherActivity.class);
+                        intent.putExtra("weather_id",weatherId);
+                        startActivity(intent);//进入到WeatherActivity当中
+                        getActivity().finish();
+                    }
+                    else if (getActivity() instanceof WeatherActivity)
+                    {
+                        WeatherActivity activity = (WeatherActivity)getActivity();
+                        activity.drawerLayout.closeDrawers();//如果当前fragment在WeatherActivity中，就关闭滑动菜单
+                        activity.swipeRefresh.setRefreshing(true);//显示下拉进度条
+                        activity.requestWeather(weatherId);//请求选择好的新城市的天气信息
+                    }
+
                 }
             }
         });
@@ -146,13 +158,9 @@ public class ChooseAreaFragment extends Fragment {
      */
     private void queryProvinces()
     {
-        Log.i("tag","line 141");
         tittleText.setText("中国");//设置头布局为“中国”
-        Log.i("tag","line 143");
         backButton.setVisibility(View.GONE);//动态设置返回按钮为隐藏
-        Log.i("tag","line 145");
         provinceList = DataSupport.findAll(Province.class);//调用LitePal的查询接口来从数据库中读取省级数据
-        Log.i("tag","provinceList.size() = " + provinceList.size());
         if (provinceList.size() > 0)
         {
             //如果从查询接口中读到了数据，就将数据显示到界面
@@ -196,7 +204,7 @@ public class ChooseAreaFragment extends Fragment {
         else
         {
             int provinceCode = selectedProvince.getProvinceCode();
-            String address = "http://guolin.tech/api/china" + provinceCode;
+            String address = "http://guolin.tech/api/china/" + provinceCode;
             queryFromServer(address,"city");
         }
     }
@@ -224,7 +232,7 @@ public class ChooseAreaFragment extends Fragment {
         {
             int provinceCode = selectedProvince.getProvinceCode();
             int cityCode = selectedCity.getCityCode();
-            String address = "http://guolin.tech/api/china" + provinceCode + "/" + cityCode;
+            String address = "http://guolin.tech/api/china/" + provinceCode + "/" + cityCode;
             queryFromServer(address,"county");
         }
     }

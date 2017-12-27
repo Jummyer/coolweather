@@ -22,16 +22,19 @@ public class Utility {
      */
     public static boolean handleProvinceResponse(String response)
     {
-        if (!TextUtils.isEmpty(response))
+        if (!TextUtils.isEmpty(response))//判断response文本内容是否为空
         {
             JSONArray allProvinces = null;
             try {
+                //将服务器返回的数据传入到一个JSONArray对象中
                 allProvinces = new JSONArray(response);
+                //使用for循环遍历JSONArray
                 for (int i = 0;i < allProvinces.length();i ++)
                 {
+                    //for循环遍历后取出的每个元素都是JSONObject对象
                     JSONObject provinceObject = allProvinces.getJSONObject(i);
                     Province province = new Province();
-                    province.setProvinceName(provinceObject.getString("name"));
+                    province.setProvinceName(provinceObject.getString("name"));//使用provinceObject.getString()方法将数据取出并放入数据库
                     province.setProvinceCode(provinceObject.getInt("id"));
                     province.save();// 使用save方法将数据保存到数据库中
                 }

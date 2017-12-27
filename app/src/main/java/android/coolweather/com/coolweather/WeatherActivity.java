@@ -8,10 +8,14 @@ import android.coolweather.com.coolweather.util.Utility;
 import android.graphics.Color;
 import android.os.Build;
 import android.preference.PreferenceManager;
+import android.support.v4.view.GravityCompat;
+import android.support.v4.widget.DrawerLayout;
+import android.support.v4.widget.SwipeRefreshLayout;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
+import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
@@ -42,15 +46,21 @@ public class WeatherActivity extends AppCompatActivity {
     private TextView carWashText;
     private TextView sportText;
     private ImageView bingpicimg;
+    public SwipeRefreshLayout swipeRefresh;
+    private String mWeatherId;//记录城市的天气id
+    public DrawerLayout drawerLayout;
+    private Button navButon;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         if (Build.VERSION.SDK_INT >= 21)
         {
+            //得到当前活动的DecroView
             View decorView = getWindow().getDecorView();
+            //改变系统的UI显示，将活动的布局显示在状态栏上面
             decorView.setSystemUiVisibility(View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN|View.SYSTEM_UI_FLAG_LAYOUT_STABLE);
-            getWindow().setStatusBarColor(Color.TRANSPARENT);
+            getWindow().setStatusBarColor(Color.TRANSPARENT);//将状态栏设置为透明色
         }
         setContentView(R.layout.activity_weather);
         //初始化各控件
@@ -66,6 +76,10 @@ public class WeatherActivity extends AppCompatActivity {
         carWashText = (TextView) findViewById(R.id.car_wash_text);
         sportText = (TextView) findViewById(R.id.sport_text);
         bingpicimg = (ImageView) findViewById(R.id.bing_pic_img);
+        swipeRefresh = (SwipeRefreshLayout) findViewById(R.id.swipe_refresh);
+        swipeRefresh.setColorSchemeColors(getResources().getColor(R.color.colorPrimary));//设置下拉进度条的颜色
+        drawerLayout = (DrawerLayout) findViewById(R.id.drawer_layout);
+        navButon = (Button) findViewById(R.id.nav_button);
 
         SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
         String weatherString = prefs.getString("weather",null);//从SharedPreferences中获取缓存好的天气信息数据
@@ -73,25 +87,43 @@ public class WeatherActivity extends AppCompatActivity {
         {
             //有缓存数据时直接解析天气数据
             Weather weather = Utility.handleWeatherResponse(weatherString);
+            mWeatherId = weather.basic.weatherId;//记录城市的天气id
             showWeatherInfo(weather);
         }
         else
         {
             //无缓存数据时去服务器查询天气
-            String weatherId = getIntent().getStringExtra("weather_id");
+            mWeatherId = getIntent().getStringExtra("weather_id");
             weatherLayout.setVisibility(View.INVISIBLE);//隐藏ScrollView
-            requestWeather(weatherId);//使用weatherId，从服务器请求数据
+            requestWeather(mWeatherId);//使用weatherId，从服务器请求数据
         }
+        //设置下拉刷新的监听器
+        swipeRefresh.setOnRefreshListener(new SwipeRefreshLayout.OnRefreshListener() {
+            @Override
+            public void onRefresh() {
+                requestWeather(mWeatherId);
+            }
+        });
 
+        //从数据库中读取缓存的背景图片
         String bingPic = prefs.getString("bing_pic",null);
         if (bingPic != null)
         {
+            //如果SharedPreference中有缓存数据就使用Gilde直接加载
             Glide.with(this).load(bingPic).into(bingpicimg);
         }
         else
         {
+            //如果SharedPreference中没有缓存的图片，就使用loadBingPic()方法从必应请求背景图
             loadBingPic();
         }
+
+        navButon.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                drawerLayout.openDrawer(GravityCompat.START);
+            }
+        });
     }
 
     /**
@@ -119,6 +151,7 @@ public class WeatherActivity extends AppCompatActivity {
                                     getDefaultSharedPreferences(WeatherActivity.this).edit();
                             editor.putString("weather",responseText);//将服务器返回的数据缓存到SharedPreferences当中。
                             editor.apply();//将数据提交
+                            mWeatherId = weather.basic.weatherId;
                             showWeatherInfo(weather);//将服务器缓存的数据显示出来
                         }
                         else
@@ -126,6 +159,7 @@ public class WeatherActivity extends AppCompatActivity {
                             //从服务器获取天气数据失败，打印吐司
                             Toast.makeText(WeatherActivity.this,"获取天气信息失败",Toast.LENGTH_SHORT).show();
                         }
+                        swipeRefresh.setRefreshing(false);//当刷新结束，隐藏进度条
                     }
                 });
             }
@@ -137,10 +171,12 @@ public class WeatherActivity extends AppCompatActivity {
                     @Override
                     public void run() {
                         Toast.makeText(WeatherActivity.this,"获取天气信息失败",Toast.LENGTH_SHORT).show();
+                        swipeRefresh.setRefreshing(false);//当刷新结束，隐藏进度条
                     }
                 });
             }
         });
+        //在每次请求天气信息的同时刷新必应背景图
         loadBingPic();
     }
 
@@ -201,14 +237,16 @@ public class WeatherActivity extends AppCompatActivity {
 
             @Override
             public void onResponse(Call call, Response response) throws IOException {
-                final String bingPic = response.body().string();
+                final String bingPic = response.body().string();//得到使用HTTP返回的具体的内容
+                //将从必应上获取到的图片缓存在SharedPreference中
                 SharedPreferences.Editor editor = PreferenceManager.
                         getDefaultSharedPreferences(WeatherActivity.this).edit();
                 editor.putString("bing_pic",bingPic);
-                editor.apply();
+                editor.apply();//提交数据
                 runOnUiThread(new Runnable() {
                     @Override
                     public void run() {
+                        //使用Gilde从网络加载图片
                         Glide.with(WeatherActivity.this).load(bingPic).into(bingpicimg);
                     }
                 });
